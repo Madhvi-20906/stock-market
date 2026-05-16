@@ -218,7 +218,7 @@ st.markdown("Advanced AI-powered terminal for real-time market insights.")
 
 # Sidebar Controls
 st.sidebar.header("Navigation & Settings")
-ticker = st.sidebar.text_input("Ticker Symbol", value="AAPL")
+ticker = st.sidebar.text_input("Ticker Symbol", value="AAPL").strip().upper()
 
 # Date range selection
 col1, col2 = st.sidebar.columns(2)
@@ -231,16 +231,28 @@ fetch_button = st.sidebar.button("Fetch Data")
 
 @st.cache_data
 def get_data(ticker, start, end):
-    df = yf.download(ticker, start=start, end=end)
-    return df
+    try:
+        # Use Ticker object for more robust fetching
+        t = yf.Ticker(ticker)
+        df = t.history(start=start, end=end)
+        
+        # If specific range fails, try period as fallback
+        if df.empty:
+            df = t.history(period="1y")
+            
+        return df
+    except Exception as e:
+        st.sidebar.error(f"Ticker Error: {e}")
+        return pd.DataFrame()
 
 if fetch_button or ticker:
     try:
         with st.spinner("Fetching market data..."):
             df = get_data(ticker, start_date, end_date)
             
-            if df.empty:
-                st.error("No data found for the given ticker and date range.")
+            if df is None or df.empty:
+                st.error(f"No data found for ticker '{ticker}' and the selected date range.")
+                st.info("💡 **Tips:** \n- Check if the ticker symbol is correct (e.g., AAPL, TSLA).\n- Verify your internet connection.\n- Markets are closed on weekends and holidays.")
             else:
                 # Top Metrics
                 latest = df.iloc[-1]
@@ -289,10 +301,10 @@ if fetch_button or ticker:
                     
                     fig.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=30, b=0), xaxis_rangeslider_visible=False, hovermode='x unified')
 
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
 
                     with st.expander("View Raw Data"):
-                        st.dataframe(df.tail(10), use_container_width=True)
+                        st.dataframe(df.tail(10), width='stretch')
                 
                 with tab2:
                     st.markdown("### 30-Day Trendline Prediction")
@@ -321,7 +333,7 @@ if fetch_button or ticker:
                         fig_pred.add_trace(go.Scatter(x=future_dates, y=future_y, mode='lines', line=dict(color='#00ff88', width=3), name='30-Day Forecast'))
                         
                         fig_pred.update_layout(template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=30, b=0), hovermode='x unified')
-                        st.plotly_chart(fig_pred, use_container_width=True)
+                        st.plotly_chart(fig_pred, width='stretch')
                     else:
                         st.warning("Not enough data to calculate a trend. Select a wider date range.")
 
@@ -374,7 +386,7 @@ if fetch_button or ticker:
                         new_price = st.number_input("Avg Buy Price ($)", min_value=0.01, value=150.0, key="p_price")
                     with col_add4:
                         st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("Add", use_container_width=True):
+                        if st.button("Add", width='stretch'):
                             st.session_state.portfolio.append({
                                 'Ticker': new_ticker,
                                 'Shares': new_shares,
@@ -408,7 +420,7 @@ if fetch_button or ticker:
                             'Total Cost': '${:.2f}',
                             'P/L ($)': '${:.2f}',
                             'P/L (%)': '{:.2f}%'
-                        }), use_container_width=True)
+                        }), width='stretch')
                         
                         total_val = port_df['Total Value'].sum()
                         total_pl = port_df['P/L ($)'].sum()
